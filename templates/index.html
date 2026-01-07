@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OptimaATS | Professional Resume Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        :root {
+            --primary: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg-slate: #f8fafc;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-slate);
+            color: #1e293b;
+            overflow-x: hidden;
+        }
+
+        .progress-ring {
+            transition: stroke-dashoffset 0.8s ease-in-out;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        .score-circle {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .score-value {
+            position: absolute;
+            font-size: 2.5rem;
+            font-weight: 800;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .drop-zone {
+            border: 2px dashed #cbd5e1;
+            transition: all 0.3s ease;
+        }
+        .drop-zone.active {
+            border-color: var(--primary);
+            background-color: #eff6ff;
+        }
+
+        .analyzing-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+
+        .llm-output-text {
+            white-space: pre-line;
+            line-height: 1.6;
+        }
+        
+        /* Custom styling for markdown-like lists from LLM */
+        .llm-output-text b, .llm-output-text strong {
+            color: #0f172a;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <nav class="sticky top-0 z-50 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+                <i class="fas fa-layer-group text-sm"></i>
+            </div>
+            <span class="text-xl font-bold tracking-tight text-slate-800">OptimaATS</span>
+        </div>
+        <div class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+            <a href="#" class="text-blue-600">Analyzer</a>
+            <a href="#" class="hover:text-blue-600 transition">Dashboard</a>
+            <button class="bg-slate-900 text-white px-4 py-2 rounded-full hover:bg-slate-800 transition">Sign In</button>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto px-4 py-8">
+        
+        <!-- STEP 1: Upload View -->
+        <section id="uploadView" class="space-y-8 py-10">
+            <div class="text-center space-y-4">
+                <h1 class="text-4xl font-extrabold text-slate-900">Deep Resume Analysis</h1>
+                <p class="text-slate-500 max-w-2xl mx-auto text-lg">Connected to Gemini 2.5 Flash. Upload your resume and target job description to begin.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8 items-start">
+                <!-- Dropzone -->
+                <div id="dropZone" class="drop-zone glass-card rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer group min-h-[350px]">
+                    <input type="file" id="fileInput" class="hidden" accept=".pdf">
+                    <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                        <i class="fas fa-cloud-upload-alt text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-slate-800">Upload Resume</h3>
+                    <p class="text-slate-400 mt-2">PDF files only (Max 5MB)</p>
+                    <button class="mt-6 bg-blue-600 text-white px-6 py-2.5 rounded-xl font-medium shadow-lg shadow-blue-200 hover:bg-blue-700 transition">Browse Files</button>
+                    <div id="fileInfo" class="mt-4 hidden font-medium text-blue-600 flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
+                        <i class="far fa-file-pdf"></i> <span id="fileName">resume.pdf</span>
+                    </div>
+                </div>
+
+                <!-- Job Description -->
+                <div class="glass-card rounded-2xl p-8 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="font-semibold text-slate-800 flex items-center gap-2">
+                            <i class="fas fa-briefcase text-slate-400"></i> Job Description
+                        </h3>
+                    </div>
+                    <textarea id="jdInput" class="w-full h-44 p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-sm text-slate-700" placeholder="Paste the full job description here to enable matching..."></textarea>
+                    <button id="analyzeBtn" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg hover:bg-slate-800 transition shadow-xl disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Run Deep Analysis
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- STEP 2: Loading State -->
+        <section id="loadingView" class="hidden py-20 text-center">
+            <div class="space-y-6">
+                <div class="relative w-24 h-24 mx-auto">
+                    <div class="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
+                    <div class="absolute inset-0 border-4 border-t-blue-600 rounded-full animate-spin"></div>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800 analyzing-pulse">Gemini is Processing...</h2>
+                <p class="text-slate-500">Extracting skills and calculating match percentage.</p>
+            </div>
+        </section>
+
+        <!-- STEP 3: Results Dashboard -->
+        <section id="resultsView" class="hidden space-y-6 pb-20">
+            <div class="flex flex-col md:flex-row gap-6">
+                <!-- Score Card -->
+                <div class="glass-card md:w-1/3 p-8 rounded-3xl flex flex-col items-center justify-center text-center">
+                    <h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6">ATS Match Score</h3>
+                    <div class="score-circle">
+                        <svg width="180" height="180">
+                            <circle class="text-slate-100" stroke-width="12" stroke="currentColor" fill="transparent" r="70" cx="90" cy="90"/>
+                            <circle id="scoreProgress" class="progress-ring text-blue-600" stroke-width="12" stroke-dasharray="440" stroke-dashoffset="440" stroke-linecap="round" stroke="currentColor" fill="transparent" r="70" cx="90" cy="90"/>
+                        </svg>
+                        <div class="score-value text-slate-800"><span id="scoreNum">0</span>%</div>
+                    </div>
+                    <p id="scoreMessage" class="mt-6 text-slate-600 font-medium">Analysis complete based on your profile and the JD.</p>
+                </div>
+
+                <!-- AI Summary -->
+                <div class="md:w-2/3 space-y-6">
+                    <div class="glass-card p-6 rounded-3xl h-full flex flex-col">
+                        <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-robot text-blue-600"></i> Detailed Match Analysis
+                        </h4>
+                        <div id="fullAnalysisText" class="text-sm text-slate-600 llm-output-text overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
+                            <!-- Populated by API -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Tabs -->
+            <div class="glass-card rounded-3xl overflow-hidden">
+                <div class="flex border-b border-slate-100 bg-slate-50/50 overflow-x-auto">
+                    <button class="tab-btn px-8 py-5 font-bold text-sm text-blue-600 border-b-2 border-blue-600 whitespace-nowrap" data-tab="parsed_resume">EXTRACTED RESUME DATA</button>
+                    <button class="tab-btn px-8 py-5 font-bold text-sm text-slate-400 border-b-2 border-transparent hover:text-slate-600 whitespace-nowrap" data-tab="parsed_jd">TARGET JD REQUIREMENTS</button>
+                </div>
+                <div class="p-8 bg-white">
+                    <div id="parsed_resume" class="tab-content active llm-output-text text-slate-600 text-sm"></div>
+                    <div id="parsed_jd" class="tab-content llm-output-text text-slate-600 text-sm"></div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200">
+                <button onclick="location.reload()" class="flex items-center gap-2 text-slate-600 hover:text-blue-600 font-medium transition">
+                    <i class="fas fa-redo"></i> Start New Analysis
+                </button>
+                <div class="flex gap-4 w-full md:w-auto">
+                    <button id="copyBtn" class="flex-1 md:flex-none bg-slate-100 text-slate-700 px-6 py-3 rounded-2xl font-bold hover:bg-slate-200 transition">Copy Report</button>
+                    <button onclick="window.print()" class="flex-1 md:flex-none bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-100">Download PDF</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Use the API URL from your backend environment
+        const API_URL = "http://127.0.0.1:8080/analyze";
+        
+        let uploadedFile = null;
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const jdInput = document.getElementById('jdInput');
+
+        // File Selection Logic
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => { 
+            if (e.target.files.length) handleFile(e.target.files[0]); 
+        });
+
+        // Drag & Drop Support
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eName => {
+            dropZone.addEventListener(eName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        });
+
+        dropZone.addEventListener('dragover', () => dropZone.classList.add('active'));
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('active'));
+        dropZone.addEventListener('drop', (e) => {
+            dropZone.classList.remove('active');
+            const files = e.dataTransfer.files;
+            if (files.length) handleFile(files[0]);
+        });
+
+        function handleFile(file) {
+            if (file.type !== 'application/pdf') {
+                alert("Please upload a PDF file.");
+                return;
+            }
+            uploadedFile = file;
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileInfo').classList.remove('hidden');
+            checkInputs();
+        }
+
+        function checkInputs() {
+            // Enable button only if both file and JD (min length) are present
+            analyzeBtn.disabled = !(uploadedFile && jdInput.value.trim().length > 20);
+        }
+
+        jdInput.addEventListener('input', checkInputs);
+
+        // Core API Integration
+        analyzeBtn.addEventListener('click', async () => {
+            document.getElementById('uploadView').classList.add('hidden');
+            document.getElementById('loadingView').classList.remove('hidden');
+
+            const formData = new FormData();
+            // Matching your backend keys: "resume" and "job_description"
+            formData.append('resume', uploadedFile);
+            formData.append('job_description', jdInput.value);
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Server Error');
+                }
+                
+                const data = await response.json();
+                renderResults(data);
+
+            } catch (err) {
+                console.error(err);
+                alert(`Analysis Error: ${err.message}. Ensure your Flask server is running on port 8080 and CORS is enabled.`);
+                location.reload();
+            }
+        });
+
+        function renderResults(data) {
+            document.getElementById('loadingView').classList.add('hidden');
+            document.getElementById('resultsView').classList.remove('hidden');
+
+            // Map keys from your Flask response to the UI
+            document.getElementById('parsed_resume').innerText = data.parsed_resume;
+            document.getElementById('parsed_jd').innerText = data.parsed_job_description;
+            document.getElementById('fullAnalysisText').innerText = data.ats_result;
+
+            // Extract Score: Looks for "Match percentage: 85" or "85%"
+            const scoreRegex = /(\d+)(?=\s?%)/; 
+            const scoreMatch = data.ats_result.match(scoreRegex);
+            const score = scoreMatch ? parseInt(scoreMatch[1]) : 70; // Fallback to 70
+
+            animateScore(score);
+        }
+
+        function animateScore(target) {
+            let current = 0;
+            const numEl = document.getElementById('scoreNum');
+            const circle = document.getElementById('scoreProgress');
+            const circumference = 70 * 2 * Math.PI;
+
+            const timer = setInterval(() => {
+                if (current >= target) {
+                    clearInterval(timer);
+                } else {
+                    current++;
+                    numEl.textContent = current;
+                    const offset = circumference - (current / 100) * circumference;
+                    circle.style.strokeDashoffset = offset;
+                }
+            }, 20);
+        }
+
+        // Tab Switching Logic
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('text-blue-600', 'border-blue-600');
+                    b.classList.add('text-slate-400', 'border-transparent');
+                });
+                btn.classList.add('text-blue-600', 'border-blue-600');
+                btn.classList.remove('text-slate-400', 'border-transparent');
+                
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(btn.getAttribute('data-tab')).classList.add('active');
+            });
+        });
+
+        // Copy Functionality
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            const text = document.getElementById('fullAnalysisText').innerText;
+            const dummy = document.createElement("textarea");
+            document.body.appendChild(dummy);
+            dummy.value = text;
+            dummy.select();
+            document.execCommand("copy");
+            document.body.removeChild(dummy);
+            
+            const originalText = document.getElementById('copyBtn').innerText;
+            document.getElementById('copyBtn').innerText = "Copied!";
+            setTimeout(() => {
+                document.getElementById('copyBtn').innerText = originalText;
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
